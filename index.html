@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>スマホ回線管理ツール - レベル2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+    <style>
+        .line-row {
+            transition: all 0.3s ease;
+        }
+        .line-row.expanded {
+            margin-bottom: 40px;
+        }
+        .action-button {
+            height: 0;
+            overflow: hidden;
+            transition: height 0.3s ease;
+        }
+        .line-row.expanded + .action-button {
+            height: 40px;
+        }
+        #line-editor {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        #editable-lines {
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4 flex justify-between items-center">
+            スマホ回線管理ツール
+            <button id="settings-btn" class="bg-gray-500 text-white px-4 py-2 rounded">設定</button>
+        </h1>
+        <div class="bg-white shadow-md rounded p-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">回線一覧</h2>
+                <div>
+                    <input type="text" id="search-input" placeholder="検索..." class="border rounded p-2 mr-2">
+                    <button id="add-line-btn" class="bg-blue-500 text-white px-4 py-2 rounded">回線を追加</button>
+                </div>
+            </div>
+            <div class="mb-4">
+                <button id="all-lines-btn" class="bg-green-500 text-white px-4 py-2 rounded mr-2">全ての回線</button>
+
+                <button id="active-lines-btn" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">有効回線</button>
+                <button id="cancelled-lines-btn" class="bg-gray-500 text-white px-4 py-2 rounded">解約回線</button>
+
+            </div>
+            <table class="table-auto w-full mb-4">
+                <thead>
+                    <tr>
+                        <th class="px-4 py-2 cursor-pointer" data-sort="name">回線名 <span class="sort-icon"></span></th>
+                        <th class="px-4 py-2 cursor-pointer" data-sort="phone">電話番号 <span class="sort-icon"></span></th>
+                        <th class="px-4 py-2 cursor-pointer" data-sort="plan">料金プラン <span class="sort-icon"></span></th>
+                        <th class="px-4 py-2 cursor-pointer" data-sort="contractDate">契約日 <span class="sort-icon"></span></th>
+                        <th id="cancellation-date-header" class="px-4 py-2 cursor-pointer hidden" data-sort="cancellationDate">解約日 <span class="sort-icon"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="line-list">
+                    <!-- データ行をここに挿入 -->
+                </tbody>
+            </table>
+        </div>
+        <!-- モーダルウィンドウ -->
+        <div id="line-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white rounded p-4 w-1/2">
+                <h2 id="modal-title" class="text-xl font-semibold mb-2">回線の追加</h2>
+                <form id="line-form">
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">回線名</label>
+                        <select id="line-name" class="border w-full p-2" required>
+                            <option value="">選択してください</option>
+                            <!-- 回線名オプションはJavaScriptで動的に生成されます -->
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">電話番号</label>
+                        <div class="flex">
+                            <select id="phone-prefix" class="border p-2 mr-2" required>
+                                <option value="">選択</option>
+                                <option value="090">090</option>
+                                <option value="080">080</option>
+                                <option value="070">070</option>
+                            </select>
+                            <input type="text" id="phone-number" class="border w-full p-2" maxlength="8" pattern="\d{8}" placeholder="残り8桁" required>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">料金プラン</label>
+                        <input type="text" id="plan" class="border w-full p-2" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">契約日</label>
+                        <input type="date" id="contract-date" class="border w-full p-2" required>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="button" id="cancel-btn" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">キャンセル</button>
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 設定モーダル -->
+        <div id="settings-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white rounded p-4 w-3/4 max-h-[90vh] overflow-y-auto">
+                <h2 class="text-xl font-semibold mb-4">設定</h2>
+                <button id="edit-lines-btn" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">回線名を編集</button>
+                <div id="line-editor" class="hidden">
+                    <h3 class="text-lg font-semibold mb-2">回線名の編集(ドラッグで並べ替え可能)</h3>
+                    <ul id="editable-lines" class="mb-4">
+                        <!-- 回線名のリストがここに表示されます -->
+                    </ul>
+                    <div class="flex mb-4">
+                        <input type="text" id="new-line-input" placeholder="新しい回線名" class="border rounded p-2 mr-2">
+                        <button id="add-new-line-btn" class="bg-green-500 text-white px-4 py-2 rounded">追加</button>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button id="close-settings-btn" class="bg-gray-500 text-white px-4 py-2 rounded">戻る</button>
+                </div>
+            </div>
+        </div>
+        <!-- 解約モーダル -->
+        <div id="cancellation-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white rounded p-4 w-1/3">
+                <h2 class="text-xl font-semibold mb-4">回線の解約</h2>
+                <form id="cancellation-form">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">解約日</label>
+                        <input type="date" id="cancellation-date" class="border w-full p-2" required>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="button" id="cancel-cancellation-btn" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">キャンセル</button>
+                        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded">解約</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 完全削除確認モーダル -->
+        <div id="delete-confirmation-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white rounded p-4 w-1/3">
+                <h2 class="text-xl font-semibold mb-4">回線の完全削除</h2>
+                <p class="mb-4">この回線を完全に削除しますか？この操作は取り消せません。</p>
+                <div class="flex justify-end">
+                    <button id="cancel-delete-btn" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">キャンセル</button>
+                    <button id="confirm-delete-btn" class="bg-red-500 text-white px-4 py-2 rounded">削除</button>
+                </div>
+            </div>
+        </div>
+        <!-- 詳細登録モーダル -->
+        <div id="details-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white rounded p-4 w-1/2">
+                <h2 class="text-xl font-semibold mb-4">詳細情報登録</h2>
+                <form id="details-form">
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">SIM末尾5桁</label>
+                        <input type="text" id="sim-last-5" class="border w-full p-2" maxlength="5" pattern="\d{5}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">予約番号</label>
+                        <input type="text" id="reservation-number" class="border w-full p-2">
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">予約番号 期限</label>
+                        <input type="date" id="reservation-deadline" class="border w-full p-2">
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">メモ</label>
+                        <textarea id="memo" class="border w-full p-2" rows="3"></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">購入場所</label>
+                        <input type="text" id="purchase-location" class="border w-full p-2">
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">端末</label>
+                        <input type="text" id="device" class="border w-full p-2">
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">キャッシュバック</label>
+                        <input type="number" id="cashback" class="border w-full p-2">
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">転入元</label>
+                        <input type="text" id="transfer-from" class="border w-full p-2">
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="button" id="cancel-details-btn" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">キャンセル</button>
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 詳細表示モーダル -->
+        <div id="view-details-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white rounded p-4 w-1/2">
+                <h2 class="text-xl font-semibold mb-4">詳細情報</h2>
+                <div id="details-content"></div>
+                <div class="flex justify-end mt-4">
+                    <button id="close-view-details-btn" class="bg-gray-500 text-white px-4 py-2 rounded">閉じる</button>
+                </div>
+            </div>
+        </div>
+        <!-- 回線編集モーダル -->
+        <div id="edit-line-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white rounded p-4 w-1/2">
+                <h2 class="text-xl font-semibold mb-4">回線の編集</h2>
+                <form id="edit-line-form">
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">回線名</label>
+                        <select id="edit-line-name" class="border w-full p-2" required>
+                            <!-- 回線名オプションはJavaScriptで動的に生成されます -->
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">電話番号</label>
+                        <div class="flex">
+                            <select id="edit-phone-prefix" class="border p-2 mr-2" required>
+                                <option value="">選択</option>
+                                <option value="090">090</option>
+                                <option value="080">080</option>
+                                <option value="070">070</option>
+                            </select>
+                            <input type="text" id="edit-phone-number" class="border w-full p-2" maxlength="8" pattern="\d{8}" placeholder="残り8桁" required>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">料金プラン</label>
+                        <input type="text" id="edit-plan" class="border w-full p-2" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">契約日</label>
+                        <input type="date" id="edit-contract-date" class="border w-full p-2" required>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="button" id="cancel-edit-btn" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">キャンセル</button>
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        // JavaScriptコード
+        const addLineBtn = document.getElementById('add-line-btn');
+        const lineModal = document.getElementById('line-modal');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const lineForm = document.getElementById('line-form');
+        const lineList = document.getElementById('line-list');
+        const searchInput = document.getElementById('search-input');
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const editLinesBtn = document.getElementById('edit-lines-btn');
+        const lineEditor = document.getElementById('line-editor');
+        const editableLines = document.getElementById('editable-lines');
+        const newLineInput = document.getElementById('new-line-input');
+        const addNewLineBtn = document.getElementById('add-new-line-btn');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+
+        let lines = JSON.parse(localStorage.getItem('lines')) || [];
+        let cancelledLines = JSON.parse(localStorage.getItem('cancelledLines')) || [];
+        let lineOptions = ['au', 'UQ', 'docomo', 'docomo代表', 'docomoデータ', 'ahamo', 'Softbank', 'Y!mobile', '楽天', 'Biglobe', 'IIJ MIO', 'BIC SIM', 'AEON Mobile', 'EDION SIM', 'OCN', 'リンクスメイト', 'mineo', 'docomoデータ①', 'docomoデータ②', 'docomoデータ③', 'docomoデータ④', 'docomo音声①', 'docomo音声②', 'docomo音声③', 'docomo音声④', 'docomo音声⑤', 'y.uモバイル', 'povo2.0', '日本通信', 'LINEMO', 'jcom'];
+
+        let currentSort = { column: null, direction: 'asc' };
+        let currentView = 'active';
+
+        const allLinesBtn = document.getElementById('all-lines-btn');
+        const activeLinesBtn = document.getElementById('active-lines-btn');
+        const cancelledLinesBtn = document.getElementById('cancelled-lines-btn');
+        const cancellationDateHeader = document.getElementById('cancellation-date-header');
+        const deleteConfirmationModal = document.getElementById('delete-confirmation-modal');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+        let currentDeleteIndex = null;
+
+        allLinesBtn.addEventListener('click', () => {
+            currentView = 'all';
+            updateLineList();
+            allLinesBtn.classList.replace('bg-gray-500', 'bg-green-500');
+            activeLinesBtn.classList.replace('bg-blue-500', 'bg-gray-500');
+            cancelledLinesBtn.classList.replace('bg-blue-500', 'bg-gray-500');
+            cancellationDateHeader.classList.remove('hidden');
+        });
+
+        activeLinesBtn.addEventListener('click', () => {
+            currentView = 'active';
+            updateLineList();
+            allLinesBtn.classList.replace('bg-green-500', 'bg-gray-500');
+            activeLinesBtn.classList.replace('bg-gray-500', 'bg-blue-500');
+            cancelledLinesBtn.classList.replace('bg-blue-500', 'bg-gray-500');
+            cancellationDateHeader.classList.add('hidden');
+        });
+
+        cancelledLinesBtn.addEventListener('click', () => {
+            currentView = 'cancelled';
+            updateLineList();
+            allLinesBtn.classList.replace('bg-green-500', 'bg-gray-500');
+            cancelledLinesBtn.classList.replace('bg-gray-500', 'bg-blue-500');
+            activeLinesBtn.classList.replace('bg-blue-500', 'bg-gray-500');
+            cancellationDateHeader.classList.remove('hidden');
+        });
+
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const column = th.dataset.sort;
+                if (currentSort.column === column) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.direction = 'asc';
+                }
+                updateLineList();
+                updateSortIcons();
+            });
+        });
+
+        function updateSortIcons() {
+            document.querySelectorAll('.sort-icon').forEach(icon => {
+                icon.textContent = '';
+            });
+            if (currentSort.column) {
+                const th = document.querySelector(`th[data-sort="${currentSort.column}"]`);
+                const icon = th.querySelector('.sort-icon');
+                icon.textContent = currentSort.direction === 'asc' ? '▲' : '▼';
+            }
+        }
+
+        addLineBtn.addEventListener('click', () => {
+            lineModal.classList.remove('hidden');
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('contract-date').value = today;
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            lineModal.classList.add('hidden');
+            lineForm.reset();
+        });
+
+        lineForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const line = {
+                name: document.getElementById('line-name').value,
+                phone: document.getElementById('phone-prefix').value + document.getElementById('phone-number').value,
+                plan: document.getElementById('plan').value,
+                contractDate: document.getElementById('contract-date').value,
+            };
+            lines.push(line);
+            saveLines();
+            updateLineList();
+            lineModal.classList.add('hidden');
+            lineForm.reset();
+        });
+
+        function saveLines() {
+            localStorage.setItem('lines', JSON.stringify(lines));
+            localStorage.setItem('cancelledLines', JSON.stringify(cancelledLines));
+        }
+
+        function updateLineList() {
+            lineList.innerHTML = '';
+            let filteredLines = [];
+            if (currentView === 'all') {
+                filteredLines = [...lines, ...cancelledLines];
+            } else if (currentView === 'active') {
+                filteredLines = lines;
+            } else {
+                filteredLines = cancelledLines;
+            }
+
+            filteredLines = filteredLines.filter(line => {
+                return line.name.includes(searchInput.value) ||
+                       line.phone.includes(searchInput.value) ||
+                       line.plan.includes(searchInput.value);
+            });
+
+            // Sort the filtered lines
+            if (currentSort.column) {
+                filteredLines.sort((a, b) => {
+                    let valueA = a[currentSort.column];
+                    let valueB = b[currentSort.column];
+                    if (currentSort.column === 'contractDate' || currentSort.column === 'cancellationDate') {
+                        valueA = new Date(valueA);
+                        valueB = new Date(valueB);
+                    }
+                    if (valueA < valueB) return currentSort.direction === 'asc' ? -1 : 1;
+                    if (valueA > valueB) return currentSort.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            filteredLines.forEach((line, index) => {
+                let row = document.createElement('tr');
+                row.className = 'line-row relative cursor-pointer';
+                
+                // 予約番号期限が設定されている場合、行の背景色を変更
+                if (line.reservationDeadline && new Date(line.reservationDeadline) > new Date()) {
+                    row.classList.add('bg-orange-100');
+                }
+                
+                let nameCell = `
+                    <td class="border px-4 py-2">
+                        ${line.name}
+                        ${line.reservationDeadline && new Date(line.reservationDeadline) > new Date() ? 
+                            `<br><span class="text-xs text-red-500">予約番号期限: ${line.reservationDeadline}</span>` : 
+                            ''}
+                    </td>
+                `;
+                
+                row.innerHTML = `
+                    ${nameCell}
+                    <td class="border px-4 py-2">${line.phone}</td>
+                    <td class="border px-4 py-2">${line.plan}</td>
+                    <td class="border px-4 py-2">${line.contractDate}</td>
+                    ${line.cancellationDate ? `<td class="border px-4 py-2">${line.cancellationDate}</td>` : '<td class="border px-4 py-2">-</td>'}
+                `;
+                let actionRow = document.createElement('tr');
+                actionRow.className = 'action-button hidden';
+                actionRow.innerHTML = `
+                    <td colspan="5" class="text-center">
+                        ${!line.cancellationDate ? `
+                            <button class="cancel-line-btn bg-red-500 text-white px-2 py-1 rounded mr-2">解約</button>
+                            <button class="edit-line-btn bg-yellow-500 text-white px-2 py-1 rounded mr-2">編集</button>
+                        ` : `
+                            <button class="reactivate-line-btn bg-green-500 text-white px-2 py-1 rounded mr-2">復活</button>
+                            <button class="delete-line-btn bg-red-500 text-white px-2 py-1 rounded mr-2">完全に削除</button>
+                        `}
+                        <button class="register-details-btn bg-blue-500 text-white px-2 py-1 rounded mr-2">詳細登録</button>
+                        <button class="view-details-btn bg-yellow-500 text-white px-2 py-1 rounded">詳細を見る</button>
+                    </td>
+                `;
+                
+                const cancelLineBtn = actionRow.querySelector('.cancel-line-btn');
+                if (cancelLineBtn) {
+                    cancelLineBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showCancellationModal(index);
+                    });
+                }
+
+                const reactivateLineBtn = actionRow.querySelector('.reactivate-line-btn');
+                if (reactivateLineBtn) {
+                    reactivateLineBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        reactivateLine(index);
+                    });
+                }
+
+                const deleteLineBtn = actionRow.querySelector('.delete-line-btn');
+                if (deleteLineBtn) {
+                    deleteLineBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showDeleteConfirmationModal(index);
+                    });
+                }
+
+                const registerDetailsBtn = actionRow.querySelector('.register-details-btn');
+                registerDetailsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showDetailsModal(index);
+                });
+
+                const viewDetailsBtn = actionRow.querySelector('.view-details-btn');
+                viewDetailsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showViewDetailsModal(index);
+                });
+
+                const editLineBtn = actionRow.querySelector('.edit-line-btn');
+                if (editLineBtn) {
+                    editLineBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showEditLineModal(index);
+                    });
+                }
+
+                row.addEventListener('click', () => {
+                    row.classList.toggle('expanded');
+                    actionRow.classList.toggle('hidden');
+                });
+                lineList.appendChild(row);
+                lineList.appendChild(actionRow);
+            });
+        }
+
+        const cancellationModal = document.getElementById('cancellation-modal');
+        const cancellationForm = document.getElementById('cancellation-form');
+        const cancelCancellationBtn = document.getElementById('cancel-cancellation-btn');
+        const cancellationDateInput = document.getElementById('cancellation-date');
+
+        let currentCancellationIndex = null;
+
+        function showCancellationModal(index) {
+            currentCancellationIndex = index;
+            const today = new Date().toISOString().split('T')[0];
+            cancellationDateInput.value = today;
+            cancellationModal.classList.remove('hidden');
+        }
+
+        cancellationForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const cancellationDate = cancellationDateInput.value;
+            cancelLine(currentCancellationIndex, cancellationDate);
+            cancellationModal.classList.add('hidden');
+        });
+
+        cancelCancellationBtn.addEventListener('click', () => {
+            cancellationModal.classList.add('hidden');
+        });
+
+        function cancelLine(index, cancellationDate) {
+            const cancelledLine = lines.splice(index, 1)[0];
+            cancelledLine.cancellationDate = cancellationDate;
+            cancelledLines.push(cancelledLine);
+            saveLines();
+            updateLineList();
+            activeLinesBtn.click();
+        }
+
+        function reactivateLine(index) {
+            const reactivatedLine = cancelledLines.splice(index, 1)[0];
+            delete reactivatedLine.cancellationDate;
+            lines.push(reactivatedLine);
+            saveLines();
+            updateLineList();
+            cancelledLinesBtn.click();
+        }
+
+        function showDeleteConfirmationModal(index) {
+            currentDeleteIndex = index;
+            deleteConfirmationModal.classList.remove('hidden');
+        }
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            deleteConfirmationModal.classList.add('hidden');
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            permanentlyDeleteLine(currentDeleteIndex);
+            deleteConfirmationModal.classList.add('hidden');
+        });
+
+        function permanentlyDeleteLine(index) {
+            cancelledLines.splice(index, 1);
+            saveLines();
+            updateLineList();
+        }
+
+        searchInput.addEventListener('input', updateLineList);
+
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+        });
+
+        editLinesBtn.addEventListener('click', () => {
+            lineEditor.classList.remove('hidden');
+            editLinesBtn.classList.add('hidden'); // 回線名を編集ボタンを非表示にする
+            updateEditableLines();
+        });
+
+        closeSettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+            lineEditor.classList.add('hidden');
+            editLinesBtn.classList.remove('hidden'); // 回線名を編集ボタンを再表示する
+        });
+
+        addNewLineBtn.addEventListener('click', () => {
+            const newLineName = newLineInput.value.trim();
+            if (newLineName !== '') {
+                lineOptions.push(newLineName);
+                updateLineNameOptions();
+                updateEditableLines();
+                newLineInput.value = '';
+            }
+        });
+
+        function updateEditableLines() {
+            editableLines.innerHTML = '';
+            lineOptions.forEach((line) => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center mb-2 cursor-move';
+                li.innerHTML = `
+                    <span>${line}</span>
+                    <button class="delete-line-btn bg-red-500 text-white px-2 py-1 rounded">削除</button>
+                `;
+                editableLines.appendChild(li);
+
+                li.querySelector('.delete-line-btn').addEventListener('click', () => deleteLineOption(line));
+            });
+
+            // SortableJSを使用して並び替え可能にする
+            new Sortable(editableLines, {
+                animation: 150,
+                ghostClass: 'bg-gray-200',
+                onEnd: updateLineOptionsFromDOM
+            });
+        }
+
+        function updateLineOptionsFromDOM() {
+            lineOptions = Array.from(editableLines.querySelectorAll('li')).map(li => li.querySelector('span').textContent);
+            updateLineNameOptions();
+        }
+
+        function deleteLineOption(lineName) {
+            const index = lineOptions.indexOf(lineName);
+            if (index > -1) {
+                lineOptions.splice(index, 1);
+                updateLineNameOptions();
+                updateEditableLines();
+            }
+        }
+
+        function updateLineNameOptions() {
+            const lineNameSelect = document.getElementById('line-name');
+            lineNameSelect.innerHTML = '<option value="">選択してください</option>';
+            lineOptions.forEach(option => {
+                const newOption = document.createElement('option');
+                newOption.value = option;
+                newOption.textContent = option;
+                lineNameSelect.appendChild(newOption);
+            });
+        }
+
+        const detailsModal = document.getElementById('details-modal');
+        const detailsForm = document.getElementById('details-form');
+        const cancelDetailsBtn = document.getElementById('cancel-details-btn');
+        const viewDetailsModal = document.getElementById('view-details-modal');
+        const detailsContent = document.getElementById('details-content');
+        const closeViewDetailsBtn = document.getElementById('close-view-details-btn');
+
+        let currentDetailsIndex = null;
+
+        function showDetailsModal(index) {
+            currentDetailsIndex = index;
+            const line = currentView === 'active' ? lines[index] : cancelledLines[index];
+            document.getElementById('sim-last-5').value = line.simLast5 || '';
+            document.getElementById('reservation-number').value = line.reservationNumber || '';
+            document.getElementById('reservation-deadline').value = line.reservationDeadline || '';
+            document.getElementById('memo').value = line.memo || '';
+            document.getElementById('purchase-location').value = line.purchaseLocation || '';
+            document.getElementById('device').value = line.device || '';
+            document.getElementById('cashback').value = line.cashback || '';
+            document.getElementById('transfer-from').value = line.transferFrom || '';
+            detailsModal.classList.remove('hidden');
+        }
+
+        detailsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const line = currentView === 'active' ? lines[currentDetailsIndex] : cancelledLines[currentDetailsIndex];
+            line.simLast5 = document.getElementById('sim-last-5').value;
+            line.reservationNumber = document.getElementById('reservation-number').value;
+            line.reservationDeadline = document.getElementById('reservation-deadline').value;
+            line.memo = document.getElementById('memo').value;
+            line.purchaseLocation = document.getElementById('purchase-location').value;
+            line.device = document.getElementById('device').value;
+            line.cashback = document.getElementById('cashback').value;
+            line.transferFrom = document.getElementById('transfer-from').value;
+            saveLines();
+            detailsModal.classList.add('hidden');
+            updateLineList();
+        });
+
+        cancelDetailsBtn.addEventListener('click', () => {
+            detailsModal.classList.add('hidden');
+        });
+
+        function showViewDetailsModal(index) {
+            const line = currentView === 'active' ? lines[index] : cancelledLines[index];
+            detailsContent.innerHTML = `
+                <p><strong>SIM末尾5桁:</strong> ${line.simLast5 || '未登録'}</p>
+                <p><strong>予約番号:</strong> ${line.reservationNumber || '未登録'}</p>
+                <p><strong>予約番号期限:</strong> ${line.reservationDeadline || '未登録'}</p>
+                <p><strong>メモ:</strong> ${line.memo || '未登録'}</p>
+                <p><strong>購入場所:</strong> ${line.purchaseLocation || '未登録'}</p>
+                <p><strong>端末:</strong> ${line.device || '未登録'}</p>
+                <p><strong>キャッシュバック:</strong> ${line.cashback || '未登録'}</p>
+                <p><strong>転入元:</strong> ${line.transferFrom || '未登録'}</p>
+            `;
+            viewDetailsModal.classList.remove('hidden');
+        }
+
+        closeViewDetailsBtn.addEventListener('click', () => {
+            viewDetailsModal.classList.add('hidden');
+        });
+
+        const editLineModal = document.getElementById('edit-line-modal');
+        const editLineForm = document.getElementById('edit-line-form');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+        let currentEditIndex = null;
+
+        function showEditLineModal(index) {
+            currentEditIndex = index;
+            const line = currentView === 'active' ? lines[index] : cancelledLines[index];
+            
+            // 回線名の選択肢を更新
+            const editLineNameSelect = document.getElementById('edit-line-name');
+            editLineNameSelect.innerHTML = '<option value="">選択してください</option>';
+            lineOptions.forEach(option => {
+                const newOption = document.createElement('option');
+                newOption.value = option;
+                newOption.textContent = option;
+                editLineNameSelect.appendChild(newOption);
+            });
+            
+            document.getElementById('edit-line-name').value = line.name;
+            const [prefix, number] = line.phone.split(/(?=\d{8}$)/);
+            document.getElementById('edit-phone-prefix').value = prefix;
+            document.getElementById('edit-phone-number').value = number;
+            document.getElementById('edit-plan').value = line.plan;
+            document.getElementById('edit-contract-date').value = line.contractDate;
+            editLineModal.classList.remove('hidden');
+        }
+        editLineForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const editedLine = {
+                name: document.getElementById('edit-line-name').value,
+                phone: document.getElementById('edit-phone-prefix').value + document.getElementById('edit-phone-number').value,
+                plan: document.getElementById('edit-plan').value,
+                contractDate: document.getElementById('edit-contract-date').value,
+            };
+            if (currentView === 'active') {
+                lines[currentEditIndex] = { ...lines[currentEditIndex], ...editedLine };
+            } else {
+                cancelledLines[currentEditIndex] = { ...cancelledLines[currentEditIndex], ...editedLine };
+            }
+            saveLines();
+            updateLineList();
+            editLineModal.classList.add('hidden');
+        });
+
+        cancelEditBtn.addEventListener('click', () => {
+            editLineModal.classList.add('hidden');
+        });
+
+        // 初期化
+        updateLineList();
+        updateLineNameOptions();
+    </script>
+</body>
+</html>
