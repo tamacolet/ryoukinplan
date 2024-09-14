@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>スマホ回線管理ツール - レベル2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
@@ -19,7 +19,8 @@
             transition: height 0.3s ease;
         }
         .line-row.expanded + .action-button {
-            height: 40px;
+            height: auto;
+            padding: 0.5rem 0;
         }
         #line-editor {
             max-height: 60vh;
@@ -30,60 +31,63 @@
             overflow-y: auto;
         }
         @media (max-width: 640px) {
-            body {
-                font-size: 16px;
+            .responsive-table {
+                display: block;
+                width: 100%;
+                overflow-x: auto;
             }
-            .container {
-                padding: 0.5rem;
-            }
-            table {
-                font-size: 14px;
-            }
-            input, select, button {
-                font-size: 16px;
-            }
+        }
+        .modal-content {
+            width: 90%;
+            max-width: 600px;
+        }
+        .nowrap {
+            white-space: nowrap;
         }
     </style>
 </head>
-<body class="bg-gray-100 text-base sm:text-lg">
-    <div class="container mx-auto p-2 sm:p-4">
-        <h1 class="text-xl sm:text-2xl font-bold mb-4 flex justify-between items-center">
-            スマホ回線管理ツール
-            <button id="settings-btn" class="bg-gray-500 text-white px-3 py-1 sm:px-4 sm:py-2 rounded text-sm sm:text-base">設定</button>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    <div class="container mx-auto p-4 flex-grow">
+        <h1 class="text-2xl font-bold mb-4 flex flex-wrap justify-between items-center">
+            <span class="mr-2 mb-2">スマホ回線管理ツール</span>
+            <button id="settings-btn" class="bg-gray-500 text-white p-2 rounded">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+            </button>
         </h1>
         <div class="bg-white shadow-md rounded p-4">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold">回線一覧</h2>
-                <div>
-                    <input type="text" id="search-input" placeholder="検索..." class="border rounded p-2 mr-2">
-                    <button id="add-line-btn" class="bg-blue-500 text-white px-4 py-2 rounded">回線を追加</button>
+            <div class="flex flex-wrap justify-between items-center mb-4">
+                <div class="flex items-center space-x-2">
+                    <button id="add-line-btn" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded">回線を追加</button>
+                    <input type="text" id="search-input" placeholder="検索..." class="border rounded p-2">
                 </div>
             </div>
-            <div class="mb-4">
-                <button id="all-lines-btn" class="bg-green-500 text-white px-4 py-2 rounded mr-2">全ての回線</button>
-
-                <button id="active-lines-btn" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">有効回線</button>
-                <button id="cancelled-lines-btn" class="bg-gray-500 text-white px-4 py-2 rounded">解約回線</button>
-
+            <div class="mb-4 flex flex-wrap">
+                <button id="all-lines-btn" class="bg-green-500 text-white px-4 py-2 rounded mr-2 mb-2">全ての回線</button>
+                <button id="active-lines-btn" class="bg-blue-500 text-white px-4 py-2 rounded mr-2 mb-2">有効回線</button>
+                <button id="cancelled-lines-btn" class="bg-gray-500 text-white px-4 py-2 rounded mb-2">解約回線</button>
             </div>
-            <table class="table-auto w-full mb-4">
-                <thead>
-                    <tr>
-                        <th class="px-4 py-2 cursor-pointer" data-sort="name">回線名 <span class="sort-icon"></span></th>
-                        <th class="px-4 py-2 cursor-pointer" data-sort="phone">電話番号 <span class="sort-icon"></span></th>
-                        <th class="px-4 py-2 cursor-pointer" data-sort="plan">料金プラン <span class="sort-icon"></span></th>
-                        <th class="px-4 py-2 cursor-pointer" data-sort="contractDate">契約日 <span class="sort-icon"></span></th>
-                        <th id="cancellation-date-header" class="px-4 py-2 cursor-pointer hidden" data-sort="cancellationDate">解約日 <span class="sort-icon"></span></th>
-                    </tr>
-                </thead>
-                <tbody id="line-list">
-                    <!-- データ行をここに挿入 -->
-                </tbody>
-            </table>
-        </div>
-        <!-- モーダルウィンドウ -->
-        <div id="line-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded p-4 w-1/2">
+            <div class="responsive-table">
+                <table class="table-auto w-full mb-4">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-2 cursor-pointer" data-sort="name">回線名<span class="sort-icon"></span></th>
+                            <th class="px-4 py-2 cursor-pointer" data-sort="phone">電話番号<span class="sort-icon"></span></th>
+                            <th class="px-4 py-2 cursor-pointer nowrap" data-sort="plan">プラン<span class="sort-icon"></span></th>
+                            <th class="px-4 py-2 cursor-pointer nowrap" data-sort="contractDate">契約日<span class="sort-icon"></span></th>
+                            <th id="cancellation-date-header" class="px-4 py-2 cursor-pointer hidden nowrap" data-sort="cancellationDate">解約日<span class="sort-icon"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="line-list">
+                        <!-- データ行をここに挿入 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>        <!-- モーダルウィンドウ -->
+        <div id="line-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center p-4">
+            <div class="modal-content bg-white rounded p-4">
                 <h2 id="modal-title" class="text-xl font-semibold mb-2">回線の追加</h2>
                 <form id="line-form">
                     <div class="mb-2">
@@ -106,7 +110,7 @@
                         </div>
                     </div>
                     <div class="mb-2">
-                        <label class="block text-sm font-medium">料金プラン</label>
+                        <label class="block text-sm font-medium">プラン</label>
                         <input type="text" id="plan" class="border w-full p-2" required>
                     </div>
                     <div class="mb-2">
@@ -122,11 +126,11 @@
         </div>
         <!-- 設定モーダル -->
         <div id="settings-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded p-4 w-3/4 max-h-[90vh] overflow-y-auto">
+            <div class="modal-content bg-white rounded p-4">
                 <h2 class="text-xl font-semibold mb-4">設定</h2>
                 <button id="edit-lines-btn" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">回線名を編集</button>
-                <div id="line-editor" class="hidden">
-                    <h3 class="text-lg font-semibold mb-2">回線名の編集(ドラッグで並べ替え可能)</h3>
+                <button id="download-csv-btn" class="bg-green-500 text-white px-4 py-2 rounded mb-4">CSVダウンロード</button>
+                <div id="line-editor" class="hidden">                    <h3 class="text-lg font-semibold mb-2">回線名の編集(ドラッグで並べ替え可能)</h3>
                     <ul id="editable-lines" class="mb-4">
                         <!-- 回線名のリストがここに表示されます -->
                     </ul>
@@ -136,13 +140,12 @@
                     </div>
                 </div>
                 <div class="flex justify-end">
-                    <button id="close-settings-btn" class="bg-gray-500 text-white px-4 py-2 rounded">戻る</button>
-                </div>
+                    <button id="close-settings-btn" class="bg-gray-500 text-white px-4 py-2 rounded">戻る</button>                </div>
             </div>
         </div>
         <!-- 解約モーダル -->
         <div id="cancellation-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded p-4 w-1/3">
+            <div class="modal-content bg-white rounded p-4">
                 <h2 class="text-xl font-semibold mb-4">回線の解約</h2>
                 <form id="cancellation-form">
                     <div class="mb-4">
@@ -158,7 +161,7 @@
         </div>
         <!-- 完全削除確認モーダル -->
         <div id="delete-confirmation-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded p-4 w-1/3">
+            <div class="modal-content bg-white rounded p-4">
                 <h2 class="text-xl font-semibold mb-4">回線の完全削除</h2>
                 <p class="mb-4">この回線を完全に削除しますか？この操作は取り消せません。</p>
                 <div class="flex justify-end">
@@ -169,7 +172,7 @@
         </div>
         <!-- 詳細登録モーダル -->
         <div id="details-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded p-4 w-1/2">
+            <div class="modal-content bg-white rounded p-4">
                 <h2 class="text-xl font-semibold mb-4">詳細情報登録</h2>
                 <form id="details-form">
                     <div class="mb-2">
@@ -213,7 +216,7 @@
         </div>
         <!-- 詳細表示モーダル -->
         <div id="view-details-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded p-4 w-1/2">
+            <div class="modal-content bg-white rounded p-4">
                 <h2 class="text-xl font-semibold mb-4">詳細情報</h2>
                 <div id="details-content"></div>
                 <div class="flex justify-end mt-4">
@@ -223,7 +226,7 @@
         </div>
         <!-- 回線編集モーダル -->
         <div id="edit-line-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded p-4 w-1/2">
+            <div class="modal-content bg-white rounded p-4">
                 <h2 class="text-xl font-semibold mb-4">回線の編集</h2>
                 <form id="edit-line-form">
                     <div class="mb-2">
@@ -245,7 +248,7 @@
                         </div>
                     </div>
                     <div class="mb-2">
-                        <label class="block text-sm font-medium">料金プラン</label>
+                        <label class="block text-sm font-medium">プラン</label>
                         <input type="text" id="edit-plan" class="border w-full p-2" required>
                     </div>
                     <div class="mb-2">
@@ -260,6 +263,9 @@
             </div>
         </div>
     </div>
+    <footer class="bg-gray-200 py-4 text-center">
+        <p>&copy; 2024 たまコイン</p>
+    </footer>
     <script>
         // JavaScriptコード
         const addLineBtn = document.getElementById('add-line-btn');
@@ -610,7 +616,10 @@
             });
 
             // SortableJSを使用して並び替え可能にする
-            new Sortable(editableLines, {
+            if (editableLines.sortableInstance) {
+                editableLines.sortableInstance.destroy();
+            }
+            editableLines.sortableInstance = new Sortable(editableLines, {
                 animation: 150,
                 ghostClass: 'bg-gray-200',
                 onEnd: updateLineOptionsFromDOM
@@ -755,8 +764,70 @@
         });
 
         // 初期化
-        updateLineList();
-        updateLineNameOptions();
+        document.addEventListener('DOMContentLoaded', () => {
+            updateLineList();
+            updateLineNameOptions();
+            activeLinesBtn.click(); // 有効回線をデフォルトで表示
+        });
+        const downloadCSVBtn = document.getElementById('download-csv-btn');
+
+downloadCSVBtn.addEventListener('click', () => {
+    const csvContent = generateCSV();
+    downloadCSV(csvContent, 'smartphone_lines.csv');
+});
+
+function generateCSV() {
+    const headers = ['回線名', '電話番号', 'プラン', '契約日', '解約日', 'SIM末尾5桁', '予約番号', '予約番号期限', 'メモ', '購入場所', '端末', 'キャッシュバック', '転入元'];
+    const csvRows = [headers];
+
+    // アクティブな回線と解約済みの回線を結合
+    const allLines = [...lines, ...cancelledLines];
+
+    allLines.forEach(line => {
+        const row = [
+            line.name,
+            line.phone,
+            line.plan,
+            line.contractDate,
+            line.cancellationDate || '',
+            line.simLast5 || '',
+            line.reservationNumber || '',
+            line.reservationDeadline || '',
+            line.memo || '',
+            line.purchaseLocation || '',
+            line.device || '',
+            line.cashback || '',
+            line.transferFrom || ''
+        ];
+        csvRows.push(row);
+    });
+
+    // CSVデータを文字列に変換（セルの内容をダブルクォートで囲み、カンマをエスケープ）
+    const csvString = csvRows.map(row => 
+        row.map(cell => `"${(cell + '').replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    // UTF-8 BOMを追加
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const csvData = new Uint8Array(bom.length + new TextEncoder().encode(csvString).length);
+    csvData.set(bom, 0);
+    csvData.set(new TextEncoder().encode(csvString), bom.length);
+
+    return csvData;
+}
+
+function downloadCSV(content, fileName) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
     </script>
 </body>
 </html>
